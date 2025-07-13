@@ -1,0 +1,232 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학과 검색</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Helvetica', sans-serif; }
+        .result-item { margin-bottom: 1rem; }
+        .result-item h3 { font-weight: bold; }
+        .result-item p { white-space: pre-wrap; }
+    </style>
+    <meta name="theme-color" content="#f0f0f0">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4">학과 검색</h1>
+        <div class="bg-white p-4 rounded shadow">
+            <div class="mb-4">
+                <label for="excel-upload" class="block text-sm font-medium text-gray-700">Excel 파일 업로드</label>
+                <input type="file" id="excel-upload" accept=".xlsx" class="mt-1 block w-full">
+            </div>
+            <div class="mb-4">
+                <label for="field" class="block text-sm font-medium text-gray-700">계열</label>
+                <select id="field" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                    <option value="">선택하세요</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label for="department" class="block text-sm font-medium text-gray-700">학과명</label>
+                <select id="department" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                    <option value="">선택하세요</option>
+                </select>
+            </div>
+            <button id="search-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">검색</button>
+        </div>
+        <div id="results" class="mt-4 bg-white p-4 rounded shadow"></div>
+    </div>
+
+    <script>
+        let fieldData = [];
+        let deptData = [];
+        let fieldToDepts = {};
+
+        // IndexedDB 설정
+        const dbName = "DepartmentSearchDB";
+        const storeName = "excelData";
+        let db;
+
+        const request = indexedDB.open(dbName, 1);
+        request.onupgradeneeded = function(event) {
+            db = event.target.result;
+            db.createObjectStore(storeName, { keyPath: "id" });
+        };
+        request.onsuccess = function(event) {
+            db = event.target.result;
+            loadCachedData();
+        };
+
+        function saveToIndexedDB(data) {
+            const transaction = db.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
+            store.put({ id: "excelData", fieldData, deptData, fieldToDepts });
+        }
+
+        function loadCachedData() {
+            const transaction = db.transaction([storeName], "readonly");
+            const store = transaction.objectStore(storeName);
+            const request = store.get("excelData");
+            request.onsuccess = function(event) {
+                if (event.target.result) {
+                    fieldData = event.target.result.fieldData;
+                    deptData = event.target.result.deptData;
+                    fieldToDepts = event.target.result.fieldToDepts;
+                    updateFieldDropdown();
+                }
+            };
+        }
+
+        function updateFieldDropdown() {
+            const fieldSelect = document.getElementById('field');
+            fieldSelect.innerHTML = '<option value="">선택하세요</option>';
+            Object.keys(fieldToDepts).sort().forEach(field => {
+                const option = document.createElement('option');
+                option.value = field;
+                option.textContent = field;
+                fieldSelect.appendChild(option);
+            });
+        }
+
+        // Excel 파일 처리
+        document.getElementById('excel-upload').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                // "계열 데이터" 시트 파싱
+                const fieldSheet = workbook.Sheets['계열 데이터'];
+                fieldData = XLSX.utils.sheet_to_json(fieldSheet, { header: ['계열', '관련 학과'], skipHeader: false });
+                fieldData = fieldData.slice(1).filter(row => row['계열'] && row['관련 학과']);
+                fieldToDepts = {};
+                fieldData.forEach(row => {
+                    fieldToDepts[row['계열']] = row['관련 학과'].split(',').map(dept => dept.trim());
+                });
+
+                // "학과 데이터" 시트 파싱
+                const deptSheet = workbook.Sheets['학과 데이터'];
+                deptData = XLSX.utils.sheet_to_json(deptSheet, { header: [
+                    '학과', '학과설명', '전공 기초', '전공 심화', '이런 학생에게 추천', '유사학과',
+                    '개설대학(한큐에 넣기)', '개설대학(서울)', '개설대학(수도권)', '개설대학(지방)',
+                    '개설대학(서울)(입력)', '개설대학(수도권)(입력)', '개설대학(지방)(입력)',
+                    '졸업 후 진로', '일반선택', '진로선택', '융합선택'
+                ], skipHeader: false });
+                deptData = deptData.slice(1).filter(row => row['학과']);
+
+                // IndexedDB에 저장
+                saveToIndexedDB({ fieldData, deptData, fieldToDepts });
+
+                // 계열 드롭다운 업데이트
+                updateFieldDropdown();
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // 계열 선택 시 학과 드롭다운 업데이트
+        document.getElementById('field').addEventListener('change', function() {
+            const field = this.value;
+            const deptSelect = document.getElementById('department');
+            deptSelect.innerHTML = '<option value="">선택하세요</option>';
+            if (field && fieldToDepts[field]) {
+                fieldToDepts[field].sort().forEach(dept => {
+                    const option = document.createElement('option');
+                    option.value = dept;
+                    option.textContent = dept;
+                    deptSelect.appendChild(option);
+                });
+            }
+        });
+
+        // 검색 버튼 클릭
+        document.getElementById('search-btn').addEventListener('click', function() {
+            const field = document.getElementById('field').value;
+            const department = document.getElementById('department').value;
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            if (!department) {
+                resultsDiv.innerHTML = '<p>학과를 선택하세요.</p>';
+                return;
+            }
+
+            const result = deptData.find(row => row['학과'] === department);
+            if (!result) {
+                resultsDiv.innerHTML = '<p>검색 결과가 없습니다.</p>';
+                return;
+            }
+
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            div.innerHTML = `
+                ${field ? `<h3>계열: ${field}</h3>` : ''}
+                <h3>학과: ${result['학과']}</h3>
+                <p><strong>학과설명:</strong> ${result['학과설명']}</p>
+                <p><strong>전공 기초:</strong> ${result['전공 기초']}</p>
+                <p><strong>이런 학생에게 추천:</strong> ${result['이런 학생에게 추천']}</p>
+                <p><strong>유사학과:</strong> ${result['유사학과']}</p>
+                <p><strong>개설대학 (서울):</strong> ${result['개설대학(서울)']}</p>
+                <p><strong>개설대학 (수도권):</strong> ${result['개설대학(수도권)']}</p>
+                <p><strong>개설대학 (지방):</strong> ${result['개설대학(지방)']}</p>
+                <p><strong>졸업 후 진로:</strong> ${result['졸업 후 진로']}</p>
+                <p><strong>일반선택:</strong> ${result['일반선택']}</p>
+                <p><strong>진로선택:</strong> ${result['진로선택']}</p>
+                <p><strong>융합선택:</strong> ${result['융합선택']}</p>
+            `;
+            resultsDiv.appendChild(div);
+        });
+
+        // PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => console.log('Service Worker 등록 성공:', reg))
+                .catch(err => console.error('Service Worker 등록 실패:', err));
+        }
+    </script>
+</body>
+</html>

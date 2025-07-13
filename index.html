@@ -42,41 +42,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>학과 검색</title>
+    <title>2025 비슬고 교육과정 박람회</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { font-family: 'Helvetica', sans-serif; }
-        .result-item { margin-bottom: 1rem; }
-        .result-item h3 { font-weight: bold; }
-        .result-item p { white-space: pre-wrap; }
+        body { font-family: 'Helvetica', sans-serif; background-color: #f5f7fa; }
+        .container { max-width: 1400px; }
+        .result-table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+        .result-table th, .result-table td { border: 1px solid #e0e0e0; padding: 0.75rem; text-align: left; vertical-align: top; }
+        .result-table th { background-color: #3498db; color: white; font-weight: bold; text-align: center; }
+        .result-table td { background-color: white; }
+        .college-th { background-color: #3498db; color: white; font-weight: bold; text-align: center; vertical-align: middle; width: 15%; }
+        .loading { display: none; color: #7f8c8d; }
+        .error { display: none; color: #e74c3c; }
+        .admin-section { display: none; margin-top: 2rem; padding: 1rem; background-color: #ecf0f1; border-radius: 0.5rem; }
+        .admin-section.active { display: block; }
     </style>
-    <meta name="theme-color" content="#f0f0f0">
+    <meta name="theme-color" content="#f5f7fa">
     <link rel="manifest" href="manifest.json">
 </head>
-<body class="bg-gray-100">
-    <div class="container mx-auto p-4">
-        <h1 class="text-2xl font-bold mb-4">학과 검색</h1>
-        <div class="bg-white p-4 rounded shadow">
-            <div class="mb-4">
-                <label for="excel-upload" class="block text-sm font-medium text-gray-700">Excel 파일 업로드</label>
-                <input type="file" id="excel-upload" accept=".xlsx" class="mt-1 block w-full">
+<body>
+    <div class="container mx-auto p-6">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2 text-center">2025 비슬고 교육과정 박람회</h1>
+        <p class="text-center text-lg text-gray-600 mb-6">계열과 학과를 선택하고 검색을 클릭하면 해당 전공에 필요한 선택과목을 알려줍니다.</p>
+        <div class="bg-white p-6 rounded-lg shadow-lg mx-auto max-w-3xl">
+            <div class="flex flex-col md:flex-row gap-6 mb-6 justify-center">
+                <div class="w-full md:w-1/2">
+                    <label for="field" class="block text-lg font-medium text-gray-700 text-center">계열</label>
+                    <select id="field" class="mt-2 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 text-lg mx-auto">
+                        <option value="">선택하세요</option>
+                    </select>
+                </div>
+                <div class="w-full md:w-1/2">
+                    <label for="department" class="block text-lg font-medium text-gray-700 text-center">학과명</label>
+                    <select id="department" class="mt-2 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 text-lg mx-auto">
+                        <option value="">선택하세요</option>
+                    </select>
+                </div>
             </div>
-            <div class="mb-4">
-                <label for="field" class="block text-sm font-medium text-gray-700">계열</label>
-                <select id="field" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
-                    <option value="">선택하세요</option>
-                </select>
-            </div>
-            <div class="mb-4">
-                <label for="department" class="block text-sm font-medium text-gray-700">학과명</label>
-                <select id="department" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
-                    <option value="">선택하세요</option>
-                </select>
-            </div>
-            <button id="search-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">검색</button>
+            <button id="search-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200 block mx-auto">검색</button>
+            <div id="loading" class="loading mt-4 text-center">데이터를 로드 중입니다...</div>
+            <div id="error" class="error mt-4 text-center"></div>
         </div>
-        <div id="results" class="mt-4 bg-white p-4 rounded shadow"></div>
+        <div id="results" class="mt-6 bg-white p-6 rounded-lg shadow-lg mx-auto max-w-3xl"></div>
+        <!-- 관리자 섹션 (하단에 숨김) -->
+        <div id="admin-section" class="admin-section">
+            <h3 class="text-lg font-medium text-gray-700">관리자 설정</h3>
+            <label for="excel-upload" class="block text-md font-medium text-gray-700 mt-2">Excel 파일 업로드</label>
+            <input type="file" id="excel-upload" accept=".xlsx" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            <p id="upload-status" class="text-sm text-gray-500 mt-2">파일을 업로드하면 데이터가 로드됩니다.</p>
+            <p id="admin-error" class="text-sm text-red-500 mt-2" style="display: none;">Excel 파일을 로드하지 못했습니다. 수동 업로드를 시도해 주세요.</p>
+        </div>
     </div>
 
     <script>
@@ -97,12 +113,14 @@
         request.onsuccess = function(event) {
             db = event.target.result;
             loadCachedData();
+            loadDefaultExcel();
         };
 
         function saveToIndexedDB(data) {
             const transaction = db.transaction([storeName], "readwrite");
             const store = transaction.objectStore(storeName);
             store.put({ id: "excelData", fieldData, deptData, fieldToDepts });
+            document.getElementById('upload-status').textContent = "데이터가 저장되었습니다.";
         }
 
         function loadCachedData() {
@@ -115,6 +133,7 @@
                     deptData = event.target.result.deptData;
                     fieldToDepts = event.target.result.fieldToDepts;
                     updateFieldDropdown();
+                    document.getElementById('upload-status').textContent = "캐시된 데이터가 로드되었습니다.";
                 }
             };
         }
@@ -130,8 +149,64 @@
             });
         }
 
-        // Excel 파일 처리
+        // 기본 Excel 파일 자동 로드
+        function loadDefaultExcel() {
+            document.getElementById('loading').style.display = 'block';
+            fetch('과목선택.xlsx')
+                .then(response => {
+                    if (!response.ok) throw new Error('Excel 파일을 찾을 수 없습니다.');
+                    return response.arrayBuffer();
+                })
+                .then(data => {
+                    const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+
+                    // "계열 데이터" 시트 파싱
+                    const fieldSheet = workbook.Sheets['계열 데이터'];
+                    fieldData = XLSX.utils.sheet_to_json(fieldSheet, { header: ['계열', '관련 학과'], skipHeader: false });
+                    fieldData = fieldData.slice(1).filter(row => row['계열'] && row['관련 학과']);
+                    fieldToDepts = {};
+                    fieldData.forEach(row => {
+                        fieldToDepts[row['계열']] = row['관련 학과'].split(',').map(dept => dept.trim());
+                    });
+
+                    // "학과 데이터" 시트 파싱
+                    const deptSheet = workbook.Sheets['학과 데이터'];
+                    deptData = XLSX.utils.sheet_to_json(deptSheet, { header: [
+                        '학과', '학과설명', '전공 기초', '전공 심화', '이런 학생에게 추천', '유사학과',
+                        '개설대학(한큐에 넣기)', '개설대학(서울)', '개설대학(수도권)', '개설대학(지방)',
+                        '개설대학(서울)(입력)', '개설대학(수도권)(입력)', '개설대학(지방)(입력)',
+                        '졸업 후 진로', '일반선택', '진로선택', '융합선택'
+                    ], skipHeader: false });
+                    deptData = deptData.slice(1).filter(row => row['학과']);
+
+                    // '이런 학생에게 추천' 및 '졸업 후 진로' 내용 엔터로 구분
+                    deptData.forEach(row => {
+                        if (row['이런 학생에게 추천']) {
+                            row['이런 학생에게 추천'] = row['이런 학생에게 추천'].replace(/•/g, '<br>• ');
+                        }
+                        if (row['졸업 후 진로']) {
+                            row['졸업 후 진로'] = row['졸업 후 진로'].replace(/•/g, '<br>• ');
+                        }
+                    });
+
+                    // IndexedDB에 저장
+                    saveToIndexedDB({ fieldData, deptData, fieldToDepts });
+
+                    // 계열 드롭다운 업데이트
+                    updateFieldDropdown();
+                    document.getElementById('loading').style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('기본 Excel 로드 실패:', error);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('admin-section').classList.add('active');
+                    document.getElementById('admin-error').style.display = 'block';
+                });
+        }
+
+        // Excel 파일 업로드 (관리자 섹션)
         document.getElementById('excel-upload').addEventListener('change', function(event) {
+            document.getElementById('loading').style.display = 'block';
             const file = event.target.files[0];
             if (!file) return;
 
@@ -159,11 +234,24 @@
                 ], skipHeader: false });
                 deptData = deptData.slice(1).filter(row => row['학과']);
 
+                // '이런 학생에게 추천' 및 '졸업 후 진로' 내용 엔터로 구분
+                deptData.forEach(row => {
+                    if (row['이런 학생에게 추천']) {
+                        row['이런 학생에게 추천'] = row['이런 학생에게 추천'].replace(/•/g, '<br>• ');
+                    }
+                    if (row['졸업 후 진로']) {
+                        row['졸업 후 진로'] = row['졸업 후 진로'].replace(/•/g, '<br>• ');
+                    }
+                });
+
                 // IndexedDB에 저장
                 saveToIndexedDB({ fieldData, deptData, fieldToDepts });
 
                 // 계열 드롭다운 업데이트
                 updateFieldDropdown();
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('upload-status').textContent = "수동 업로드 완료.";
+                document.getElementById('admin-error').style.display = 'none';
             };
             reader.readAsArrayBuffer(file);
         });
@@ -191,34 +279,50 @@
             resultsDiv.innerHTML = '';
 
             if (!department) {
-                resultsDiv.innerHTML = '<p>학과를 선택하세요.</p>';
+                resultsDiv.innerHTML = '<p class="text-red-500 text-center">학과를 선택하세요.</p>';
                 return;
             }
 
             const result = deptData.find(row => row['학과'] === department);
             if (!result) {
-                resultsDiv.innerHTML = '<p>검색 결과가 없습니다.</p>';
+                resultsDiv.innerHTML = '<p class="text-red-500 text-center">검색 결과가 없습니다.</p>';
                 return;
             }
 
-            const div = document.createElement('div');
-            div.className = 'result-item';
-            div.innerHTML = `
-                ${field ? `<h3>계열: ${field}</h3>` : ''}
-                <h3>학과: ${result['학과']}</h3>
-                <p><strong>학과설명:</strong> ${result['학과설명']}</p>
-                <p><strong>전공 기초:</strong> ${result['전공 기초']}</p>
-                <p><strong>이런 학생에게 추천:</strong> ${result['이런 학생에게 추천']}</p>
-                <p><strong>유사학과:</strong> ${result['유사학과']}</p>
-                <p><strong>개설대학 (서울):</strong> ${result['개설대학(서울)']}</p>
-                <p><strong>개설대학 (수도권):</strong> ${result['개설대학(수도권)']}</p>
-                <p><strong>개설대학 (지방):</strong> ${result['개설대학(지방)']}</p>
-                <p><strong>졸업 후 진로:</strong> ${result['졸업 후 진로']}</p>
-                <p><strong>일반선택:</strong> ${result['일반선택']}</p>
-                <p><strong>진로선택:</strong> ${result['진로선택']}</p>
-                <p><strong>융합선택:</strong> ${result['융합선택']}</p>
+            const table = document.createElement('table');
+            table.className = 'result-table mx-auto';
+            table.innerHTML = `
+                <tr><th colspan="3" class="text-center">학과 설명</th></tr>
+                <tr><td colspan="3">${result['학과설명']}</td></tr>
+                <tr><th colspan="3" class="text-center">일반선택과목 예시</th></tr>
+                <tr><td colspan="3">${result['일반선택']}</td></tr>
+                <tr><th colspan="3" class="text-center">진로선택과목 예시</th></tr>
+                <tr><td colspan="3">${result['진로선택']}</td></tr>
+                <tr><th colspan="3" class="text-center">융합선택과목 예시</th></tr>
+                <tr><td colspan="3">${result['융합선택']}</td></tr>
+                <tr><th colspan="3" class="text-center">대학 전공 과목</th></tr>
+                <tr><td colspan="3">${(result['전공 기초'] ? '<br>' + result['전공 기초'].replace(/\n/g, '<br>') : '') + (result['전공 심화'] ? '<br>(전공 심화)<br>' + result['전공 심화'].replace(/\n/g, '<br>') : '')}</td></tr>
+                <tr><th colspan="3" class="text-center">이런 학생에게 추천</th></tr>
+                <tr><td colspan="3">${(result['이런 학생에게 추천'] || '').replace(/\n/g, '<br>')}</td></tr>
+                <tr><th colspan="3" class="text-center">유사학과</th></tr>
+                <tr><td colspan="3">${result['유사학과']}</td></tr>
+                <tr>
+                    <th class="college-th" rowspan="3">개설<br>대학</th>
+                    <td class="border px-2 py-2 font-bold w-[15%]">서울</td>
+                    <td class="border px-2 py-2 w-[70%]">${result['개설대학(서울)']}</td>
+                </tr>
+                <tr>
+                    <td class="border px-2 py-2 font-bold w-[15%]">수도권</td>
+                    <td class="border px-2 py-2 w-[70%]">${result['개설대학(수도권)']}</td>
+                </tr>
+                <tr>
+                    <td class="border px-2 py-2 font-bold w-[15%]">지방</td>
+                    <td class="border px-2 py-2 w-[70%]">${result['개설대학(지방)']}</td>
+                </tr>
+                <tr><th colspan="3" class="text-center">졸업 후 진로</th></tr>
+                <tr><td colspan="3">${(result['졸업 후 진로'] || '').replace(/•/g, '<br>• ')}</td></tr>
             `;
-            resultsDiv.appendChild(div);
+            resultsDiv.appendChild(table);
         });
 
         // PWA Service Worker

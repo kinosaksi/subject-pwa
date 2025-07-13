@@ -53,6 +53,11 @@
         .result-table th { background-color: #3498db; color: white; font-weight: bold; text-align: center; }
         .result-table td { background-color: white; }
         .college-th { background-color: #3498db; color: white; font-weight: bold; text-align: center; vertical-align: middle; width: 15%; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); }
+        .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 5px; width: 80%; max-height: 80vh; overflow-y: auto; }
+        .department-table { width: 100%; border-collapse: collapse; }
+        .department-table th, .department-table td { border: 1px solid #e0e0e0; padding: 0.5rem; }
+        .department-table th { background-color: #3498db; color: white; font-weight: bold; }
         .loading { display: none; color: #7f8c8d; }
         .error { display: none; color: #e74c3c; }
         .admin-section { display: none; margin-top: 2rem; padding: 1rem; background-color: #ecf0f1; border-radius: 0.5rem; }
@@ -65,6 +70,7 @@
     <div class="container mx-auto p-6">
         <h1 class="text-3xl font-bold text-gray-800 mb-2 text-center">2025 비슬고 교육과정 박람회</h1>
         <h2 class="text-2xl font-semibold text-gray-600 mb-6 text-center">희망 학과별 선택과목 안내</h2>
+        <button id="show-department-list" class="mb-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md block mx-auto">계열별 학과 목록 보기</button>
         <p class="text-center text-lg text-gray-600 mb-6">계열과 학과를 선택하고 검색을 클릭하면 해당 전공에 필요한 선택과목을 알려줍니다.</p>
         <div class="bg-white p-6 rounded-lg shadow-lg mx-auto max-w-3xl">
             <div class="flex flex-col md:flex-row gap-6 mb-6 justify-center">
@@ -86,6 +92,14 @@
             <div id="error" class="error mt-4 text-center"></div>
         </div>
         <div id="results" class="mt-6 bg-white p-6 rounded-lg shadow-lg mx-auto max-w-3xl"></div>
+        <!-- 학과 목록 모달 -->
+        <div id="department-modal" class="modal">
+            <div class="modal-content">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">계열별 학과 목록</h3>
+                <table id="modal-departments" class="department-table"></table>
+                <button id="close-modal" class="mt-4 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md">닫기</button>
+            </div>
+        </div>
         <!-- 관리자 섹션 (하단에 숨김) -->
         <div id="admin-section" class="admin-section">
             <h3 class="text-lg font-medium text-gray-700">관리자 설정</h3>
@@ -100,6 +114,28 @@
         let fieldData = [];
         let deptData = [];
         let fieldToDepts = {};
+
+        // 계열 및 학과 데이터 (직접 입력)
+        const departmentData = {
+            "언어·문학": "국어국문학과, 동양어학과, 서양어학과, 영어영문학과, 통번역학과",
+            "인문과학": "고고학과, 문화재보존학과, 문화콘텐츠학과, 문헌정보학과, 사학과, 인류학과, 철학과",
+            "상경": "경영학과, 경제학과, 금융보험학과, 무역·유통학과, 세무·회계학과, 호텔·관광경영학과",
+            "광고언론정보": "광고홍보학과, 언론정보학과, 정보미디어학과",
+            "사회_": "국제학과, 사회학과, 사회복지학과, 심리학과, 아동학과, 정치외교학과, 지리학과, 항공서비스학과",
+            "법·행정": "법학과, 보건행정학과, 행정학과",
+            "자연과학": "대기과학과, 물리학과, 생명과학과, 수학과, 지질학과, 천문학과, 통계학과, 화학과",
+            "생활과학": "식품영양학과, 의류학과",
+            "농학": "식물자원학과, 동물자원학과, 원예학과, 조경학과",
+            "기계·전기·전자": "기계공학과, 스마트모빌리티학과, 전기공학과, 전자공학과, 제어계측공학과, 항공우주공학과, 항공운항학과",
+            "정보·컴퓨터": "컴퓨터공학과, 소프트웨어학과, 인공지능학과, 빅데이터학과, 정보통신공학과, 정보보안학과, 멀티미디어학과, 융합학과, 산업공학과",
+            "건축·환경": "건축학과, 건축공학과, 교통공학과, 도시공학과, 토목공학과, 해양공학과, 환경공학과",
+            "화학·생명": "생명공학과, 섬유공학과, 식품공학과, 신소재공학과, 에너지자원공학과, 재료공학과, 화장품과학과, 화학공학과",
+            "보건": "간호학과, 물리치료학과, 응급구조학과, 임상병리학과, 재활치료학과, 치기공학과, 치위생학과",
+            "의약학": "수의학과, 약학과, 의예과, 치의예과, 한의예과",
+            "교육": "언어 교과 교육과, 사회 교과 교육과, 수학교육과, 과학 교과 교육과, 교육학과, 초등교육과, 유아교육과",
+            "예술": "회화과, 조소과, 공예과(조형학과), 디자인과, 미술교육과, 성악과, 피아노과, 관현악과, 작곡과, 한국음악과, 음악교육과, 연극영화학과, 영상학과, 사진학과, 문예창작학과",
+            "체육": "체육학과, 스포츠과학과, 체육교육과, 스포츠의학과, 스포츠경영학과, 무용학과"
+        };
 
         // IndexedDB 설정
         const dbName = "DepartmentSearchDB";
@@ -149,6 +185,26 @@
                 fieldSelect.appendChild(option);
             });
         }
+
+        // 계열별 학과 목록 모달 열기
+        document.getElementById('show-department-list').addEventListener('click', function() {
+            const modal = document.getElementById('department-modal');
+            const modalDepartments = document.getElementById('modal-departments');
+            let tableContent = '<tr><th class="w-1/4">계열</th><th class="w-3/4">학과</th></tr>';
+
+            for (const [field, departments] of Object.entries(departmentData)) {
+                const deptList = departments.split(', ').join('<br>');
+                tableContent += `<tr><td>${field}</td><td>${deptList}</td></tr>`;
+            }
+
+            modalDepartments.innerHTML = tableContent || '<tr><td colspan="2">학과 데이터가 없습니다.</td></tr>';
+            modal.style.display = 'block';
+        });
+
+        // 모달 닫기
+        document.getElementById('close-modal').addEventListener('click', function() {
+            document.getElementById('department-modal').style.display = 'none';
+        });
 
         // 기본 Excel 파일 자동 로드
         function loadDefaultExcel() {
